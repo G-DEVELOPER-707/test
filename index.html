@@ -81,7 +81,13 @@ try{const r=JSON.parse(localStorage.getItem(KEY)||"{}");store.pos=r.pos||{};stor
 function save(){try{localStorage.setItem(KEY,JSON.stringify(store))}catch(e){}}
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
-function shuf(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+/* Aralashtirish: imkon bo‘lsa brauzerning kriptografik tasodifiy generatoridan foydalanadi */
+function rnd(n){
+  try{const c=window.crypto||window.msCrypto,m=Math.floor(4294967296/n)*n,u=new Uint32Array(1);
+    do{c.getRandomValues(u)}while(u[0]>=m);return u[0]%n}catch(e){return Math.floor(Math.random()*n)}
+}
+function shuf(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+const vname=v=>v==="r"?"Tasodifiy":v+"-variant";
 
 /* "Barchasi", "A va B" kabi boshqa variantlarga tayanadigan savollarda tartib o‘zgarmaydi */
 const POS=/hammasi|barcha|yuqorida|sanab|ikkalasi|hech biri|\b[A-F]\s*(va|,|\+|-)\s*[A-F]\b/i;
@@ -119,12 +125,19 @@ function home(){
     info.append(el("span","s",a+"–"+b+"-savollar"+(r?" · oxirgi natija: "+r.correct+" / "+r.total+" ("+Math.round(r.correct*100/r.total)+"%)":"")));
     c.append(num,info);c.onclick=()=>startVariant(v);APP.append(c);
   }
+  const rc=el("button","vc"),rn=el("div","num","🎲"),ri=el("div");
+  ri.append(el("b",null,"Tasodifiy"));
+  const rr=store.res.r;
+  ri.append(el("span","s","Barcha savollardan tasodifiy "+Math.min(SIZE,QS.length)+" ta"+(rr?" · oxirgi natija: "+rr.correct+" / "+rr.total+" ("+Math.round(rr.correct*100/rr.total)+"%)":"")));
+  rc.append(rn,ri);rc.onclick=()=>startVariant("r");APP.append(rc);
 }
 
 function startVariant(v){
   V=v;
-  const R=RANGES[v-1],list=QS.slice(R[0],R[1]);
-  items=list.map((q,i)=>{const gi=R[0]+i;return {gi,q,sel:null,ord:order(q,store.pos[gi])}});
+  let idx;
+  if(v==="r")idx=shuf([...QS.keys()]).slice(0,Math.min(SIZE,QS.length));
+  else{const R=RANGES[v-1];idx=[...Array(R[1]-R[0]).keys()].map(i=>R[0]+i)}
+  items=idx.map(gi=>{const q=QS[gi];return {gi,q,sel:null,ord:order(q,store.pos[gi])}});
   cur=0;done=false;pend=false;visited=new Set();elapsed=0;
   mark(0);t0=Date.now();
   clearInterval(tm);clearTimeout(adv);
@@ -165,7 +178,7 @@ function render(){
   const back=el("button","btn sm","← Variantlar");back.onclick=leave;
   const tmr=el("span","timer",fmt(done?elapsed:Math.floor((Date.now()-t0)/1000)));tmr.id="timer";
   row.append(back,tmr);
-  top.append(row,el("h1",null,DATA.subject),el("div","meta",V+"-variant · "+(done?"Natija":"Javob berilgan: "+a+" / "+n)));
+  top.append(row,el("h1",null,DATA.subject),el("div","meta",vname(V)+" · "+(done?"Natija":"Javob berilgan: "+a+" / "+n)));
   const bar=el("div","bar"),bi=el("i");bi.style.width=(done?100:a/n*100)+"%";bar.append(bi);top.append(bar);
   APP.append(top);
 
@@ -234,8 +247,8 @@ function resultCard(){
     el("p",null,"Noto‘g‘ri: "+items.filter(i=>i.sel!=null&&i.sel!==i.q.answer).length+" ta · Javobsiz: "+items.filter(i=>i.sel==null).length+" ta · Vaqt: "+fmt(elapsed)),
     el("p",null,"Raqamlarni bosib har bir savolni ko‘rib chiqing."));
   const acts=el("div","acts");
-  const again=el("button","btn p","Shu variantni qaytadan");again.onclick=()=>startVariant(V);acts.append(again);
-  if(V<NV){const nx=el("button","btn","Keyingi: "+(V+1)+"-variant");nx.onclick=()=>startVariant(V+1);acts.append(nx)}
+  const again=el("button","btn p",V==="r"?"Yangi tasodifiy test":"Shu variantni qaytadan");again.onclick=()=>startVariant(V);acts.append(again);
+  if(V!=="r"&&V<NV){const nx=el("button","btn","Keyingi: "+(V+1)+"-variant");nx.onclick=()=>startVariant(V+1);acts.append(nx)}
   const hm=el("button","btn","Variantlar");hm.onclick=home;acts.append(hm);
   card.append(acts);return card;
 }
